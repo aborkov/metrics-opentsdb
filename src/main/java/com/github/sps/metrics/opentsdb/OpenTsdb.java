@@ -15,6 +15,7 @@
  */
 package com.github.sps.metrics.opentsdb;
 
+import org.glassfish.jersey.filter.LoggingFilter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -102,6 +103,7 @@ public class OpenTsdb {
         client.property(ClientProperties.READ_TIMEOUT, readTimeout);
 
         this.apiResource = client.target(baseURL);
+        this.apiResource.register(new LoggingFilter());
     }
 
     public void setBatchSizeLimit(int batchSizeLimit) {
