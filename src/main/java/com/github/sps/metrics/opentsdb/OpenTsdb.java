@@ -15,7 +15,12 @@
  */
 package com.github.sps.metrics.opentsdb;
 
-import org.glassfish.jersey.filter.LoggingFilter;
+import com.sun.jersey.api.client.Client;
+import com.sun.jersey.api.client.WebResource;
+import com.sun.jersey.api.client.config.ClientConfig;
+import com.sun.jersey.api.client.config.DefaultClientConfig;
+import com.sun.jersey.api.client.filter.LoggingFilter;
+import com.sun.jersey.api.json.JSONConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -23,12 +28,6 @@ import javax.ws.rs.core.MediaType;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
-import javax.ws.rs.client.Client;
-import javax.ws.rs.client.ClientBuilder;
-import javax.ws.rs.client.Entity;
-import javax.ws.rs.client.WebTarget;
-import org.glassfish.jersey.client.ClientProperties;
-import org.glassfish.jersey.jackson.JacksonFeature;
 
 /**
  * OpenTSDB 2.0 jersey based REST client
@@ -58,20 +57,18 @@ public class OpenTsdb {
      * create a client by providing the underlying WebResource
      *
      * @param apiResource
-     * @return 
      */
-    public static OpenTsdb create(WebTarget apiResource) {
+    public static OpenTsdb create(WebResource apiResource) {
         return new OpenTsdb(apiResource);
     }
 
-    private final WebTarget apiResource;
+    private final WebResource apiResource;
     private int batchSizeLimit = DEFAULT_BATCH_SIZE_LIMIT;
 
     public static class Builder {
-
         private Integer connectionTimeout = CONN_TIMEOUT_DEFAULT_MS;
         private Integer readTimeout = READ_TIMEOUT_DEFAULT_MS;
-        private final String baseUrl;
+        private String baseUrl;
 
         public Builder(String baseUrl) {
             this.baseUrl = baseUrl;
@@ -92,18 +89,21 @@ public class OpenTsdb {
         }
     }
 
-    private OpenTsdb(WebTarget apiResource) {
+    private OpenTsdb(WebResource apiResource) {
         this.apiResource = apiResource;
     }
 
     private OpenTsdb(String baseURL, Integer connectionTimeout, Integer readTimeout) {
-        final Client client = ClientBuilder.newBuilder()
-                .register(JacksonFeature.class).build();
-        client.property(ClientProperties.CONNECT_TIMEOUT, connectionTimeout);
-        client.property(ClientProperties.READ_TIMEOUT, readTimeout);
 
-        this.apiResource = client.target(baseURL);
-        this.apiResource.register(new LoggingFilter());
+        final ClientConfig clientConfig = new DefaultClientConfig();
+        clientConfig.getFeatures().put(JSONConfiguration.FEATURE_POJO_MAPPING, Boolean.TRUE);
+
+        final Client client = Client.create(clientConfig);
+        client.setConnectTimeout(connectionTimeout);
+        client.setReadTimeout(readTimeout);
+
+        this.apiResource = client.resource(baseURL);
+        this.apiResource.addFilter(new LoggingFilter());
     }
 
     public void setBatchSizeLimit(int batchSizeLimit) {
@@ -131,7 +131,7 @@ public class OpenTsdb {
         // alternatively you can enable chunked request
         if (batchSizeLimit > 0 && metrics.size() > batchSizeLimit) {
             final Set<OpenTsdbMetric> smallMetrics = new HashSet<OpenTsdbMetric>();
-            for (final OpenTsdbMetric metric : metrics) {
+            for (final OpenTsdbMetric metric: metrics) {
                 smallMetrics.add(metric);
                 if (smallMetrics.size() >= batchSizeLimit) {
                     sendHelper(smallMetrics);
@@ -153,9 +153,11 @@ public class OpenTsdb {
          */
         if (!metrics.isEmpty()) {
             try {
-                final Entity<?> entity = Entity.entity(metrics, MediaType.APPLICATION_JSON);
-                apiResource.path("/api/put").request().post(entity);
-            } catch (Exception ex) {
+                apiResource.path("/api/put")
+                        .type(MediaType.APPLICATION_JSON)
+                        .entity(metrics)
+                        .post();
+            } catch(Exception ex) {
                 logger.error("send to opentsdb endpoint failed", ex);
             }
         }
