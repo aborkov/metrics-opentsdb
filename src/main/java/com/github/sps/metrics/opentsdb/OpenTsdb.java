@@ -153,7 +153,7 @@ public class OpenTsdb {
          */
         if (!metrics.isEmpty()) {
             try {
-                apiResource.path("/api/put")
+                apiResource.path("/api/put?details")
                         .type(MediaType.APPLICATION_JSON)
                         .entity(metrics)
                         .post();
