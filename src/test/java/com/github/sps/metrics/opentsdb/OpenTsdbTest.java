@@ -53,7 +53,7 @@ public class OpenTsdbTest {
 
     @Test
     public void testSend() {
-        when(apiResource.path("/api/put")).thenReturn(apiResource);
+        when(apiResource.path("/api/put?details")).thenReturn(apiResource);
         when(apiResource.type(MediaType.APPLICATION_JSON)).thenReturn(mockBuilder);
         when(mockBuilder.entity(anyObject())).thenReturn(mockBuilder);
         openTsdb.send(OpenTsdbMetric.named("foo").build());
@@ -62,7 +62,7 @@ public class OpenTsdbTest {
 
     @Test
     public void testSendMultiple() {
-        when(apiResource.path("/api/put")).thenReturn(apiResource);
+        when(apiResource.path("/api/put?details")).thenReturn(apiResource);
         when(apiResource.type(MediaType.APPLICATION_JSON)).thenReturn(mockBuilder);
         when(mockBuilder.entity(anyObject())).thenReturn(mockBuilder);
 
