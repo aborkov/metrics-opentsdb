@@ -19,6 +19,7 @@ import com.codahale.metrics.*;
 import com.codahale.metrics.Timer;
 import com.github.sps.metrics.opentsdb.OpenTsdb;
 import com.github.sps.metrics.opentsdb.OpenTsdbMetric;
+import com.google.common.collect.ImmutableSortedMap;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -29,6 +30,8 @@ import org.mockito.runners.MockitoJUnitRunner;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 
+import static com.github.sps.metrics.OpenTsdbReporterTest.GenericGauge.newGauge;
+import static com.google.common.collect.Sets.newHashSet;
 import static org.junit.Assert.assertEquals;
 import static org.mockito.Mockito.*;
 
@@ -38,6 +41,7 @@ import static org.mockito.Mockito.*;
 @RunWith(MockitoJUnitRunner.class)
 public class OpenTsdbReporterTest {
 
+    private static final Map<String, String> TAGS = Collections.singletonMap("foo", "bar");
     private OpenTsdbReporter reporter;
 
     @Mock
@@ -68,11 +72,27 @@ public class OpenTsdbReporterTest {
                 .convertRatesTo(TimeUnit.SECONDS)
                 .convertDurationsTo(TimeUnit.MILLISECONDS)
                 .filter(MetricFilter.ALL)
-                .withTags(Collections.singletonMap("foo", "bar"))
+                .withTags(TAGS)
                 .withBatchSize(100)
                 .build(opentsdb);
 
         when(clock.getTime()).thenReturn(timestamp * 1000);
+    }
+
+    @Test
+    public void shouldReportOnlyNumericValues() throws Exception {
+        SortedMap<String, Gauge> gaugesWithNonNumericValues = ImmutableSortedMap.of(
+                "string", newGauge("string"),
+                "boolean", newGauge(true),
+                "numeric", newGauge(1),
+                "floating", newGauge(55.0));
+
+        reporter.report(gaugesWithNonNumericValues, this.<Counter>map(), this.<Histogram>map(), this.<Meter>map(), this.<Timer>map());
+
+        verify(opentsdb).send(newHashSet(
+                OpenTsdbMetric.named("prefix.numeric.value").withTimestamp(timestamp).withValue(1).withTags(TAGS).build(),
+                OpenTsdbMetric.named("prefix.floating.value").withTimestamp(timestamp).withValue(55.0).withTags(TAGS).build()
+        ));
     }
 
     @Test
@@ -275,5 +295,23 @@ public class OpenTsdbReporterTest {
         final TreeMap<String, T> map = new TreeMap<String, T>();
         map.put(name, metric);
         return map;
+    }
+
+    static class GenericGauge<T> implements Gauge<T> {
+
+        private final T value;
+
+        public GenericGauge(T value) {
+            this.value = value;
+        }
+
+        public static <K> Gauge newGauge(K value) {
+            return new GenericGauge<K>(value);
+        }
+
+        @Override
+        public T getValue() {
+            return value;
+        }
     }
 }

@@ -211,7 +211,11 @@ public class OpenTsdbReporter extends ScheduledReporter {
         final Set<OpenTsdbMetric> metrics = new HashSet<OpenTsdbMetric>();
 
         for (Map.Entry<String, Gauge> g : gauges.entrySet()) {
-            if(g.getValue().getValue() instanceof Collection && ((Collection)g.getValue().getValue()).isEmpty()) {
+            Object gaugeValue = g.getValue().getValue();
+            if(gaugeValue instanceof Collection && ((Collection) gaugeValue).isEmpty()) {
+                continue;
+            }
+            if(!(gaugeValue instanceof Number)) {
                 continue;
             }
             metrics.add(buildGauge(g.getKey(), g.getValue(), timestamp));
