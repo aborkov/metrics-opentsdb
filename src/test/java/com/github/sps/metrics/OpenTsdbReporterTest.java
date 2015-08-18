@@ -74,6 +74,8 @@ public class OpenTsdbReporterTest {
                 .filter(MetricFilter.ALL)
                 .withTags(TAGS)
                 .withBatchSize(100)
+                .withPeriod(100)
+                .withPeriod(TimeUnit.MILLISECONDS)
                 .build(opentsdb);
 
         when(clock.getTime()).thenReturn(timestamp * 1000);
@@ -149,7 +151,7 @@ public class OpenTsdbReporterTest {
         verify(opentsdb).send(captor.capture());
 
         final Set<OpenTsdbMetric> metrics = captor.getValue();
-        assertEquals(11, metrics.size());
+        assertEquals(10, metrics.size());
 
         final OpenTsdbMetric metric = metrics.iterator().next();
         assertEquals((Long) timestamp, metric.getTimestamp());
@@ -164,7 +166,6 @@ public class OpenTsdbReporterTest {
         assertEquals(histMap.get("prefix.histogram.mean"), 3.0);
         assertEquals(histMap.get("prefix.histogram.min"), 4L);
 
-        assertEquals((Double) histMap.get("prefix.histogram.stddev"), 5.0, 0.0001);
         assertEquals((Double) histMap.get("prefix.histogram.median"), 6.0, 0.0001);
         assertEquals((Double) histMap.get("prefix.histogram.p75"), 7.0, 0.0001);
         assertEquals((Double) histMap.get("prefix.histogram.p95"), 8.0, 0.0001);
@@ -203,7 +204,7 @@ public class OpenTsdbReporterTest {
         verify(opentsdb).send(captor.capture());
 
         final Set<OpenTsdbMetric> metrics = captor.getValue();
-        assertEquals(15, metrics.size());
+        assertEquals(10, metrics.size());
 
         final OpenTsdbMetric metric = metrics.iterator().next();
         assertEquals((Long) timestamp, metric.getTimestamp());
@@ -219,7 +220,6 @@ public class OpenTsdbReporterTest {
         assertEquals((Double) timerMap.get("prefix.timer.max"), 2E-6, 0.0001);
         assertEquals((Double) timerMap.get("prefix.timer.mean"), 3.0E-6, 0.0001);
         assertEquals((Double) timerMap.get("prefix.timer.min"), 4E-6, 0.0001);
-        assertEquals((Double) timerMap.get("prefix.timer.stddev"), 5.0E-6, 0.0001);
         assertEquals((Double) timerMap.get("prefix.timer.p75"), 7.0E-6, 0.0001);
         assertEquals((Double) timerMap.get("prefix.timer.p95"), 8.0E-6, 0.0001);
         assertEquals((Double) timerMap.get("prefix.timer.p98"), 9.0E-6, 0.0001);
@@ -228,10 +228,6 @@ public class OpenTsdbReporterTest {
         assertEquals((Double) timerMap.get("prefix.timer.median"), 6.0E-6, 0.0001);
 
         //convert rate to seconds,
-        assertEquals((Double) timerMap.get("prefix.timer.mean_rate"), 1.0, 0.0001);
-        assertEquals((Double) timerMap.get("prefix.timer.m1"), 2.0, 0.0001);
-        assertEquals((Double) timerMap.get("prefix.timer.m5"), 3.0, 0.0001);
-        assertEquals((Double) timerMap.get("prefix.timer.m15"), 4.0, 0.0001);
     }
 
 

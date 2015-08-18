@@ -9,7 +9,7 @@
 
     <groupId>com.github.sps.metrics</groupId>
     <artifactId>metrics-opentsdb</artifactId>
-    <version>1.0.5.infra-SNAPSHOT</version>
+    <version>1.0.6.infra-SNAPSHOT</version>
     <packaging>jar</packaging>
 
     <name>metrics-opentsdb</name>
@@ -80,10 +80,28 @@
         </dependency>
 
         <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-lang3</artifactId>
+            <version>3.2.1</version>
+        </dependency>
+
+        <dependency>
             <groupId>junit</groupId>
             <artifactId>junit</artifactId>
             <version>${junit.version}</version>
             <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>pl.pragmatists</groupId>
+            <artifactId>JUnitParams</artifactId>
+            <version>1.0.3</version>
+            <scope>test</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>junit</groupId>
+                    <artifactId>junit</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
 
         <dependency>
@@ -109,7 +127,6 @@
             <groupId>com.google.guava</groupId>
             <artifactId>guava</artifactId>
             <version>${guava.version}</version>
-            <scope>test</scope>
         </dependency>
     </dependencies>
 
@@ -224,7 +241,7 @@
                                         <limit implementation="org.jacoco.report.check.Limit">
                                             <counter>COMPLEXITY</counter>
                                             <value>COVEREDRATIO</value>
-                                            <minimum>0.90</minimum>
+                                            <minimum>0.89</minimum>
                                         </limit>
                                     </limits>
                                 </rule>

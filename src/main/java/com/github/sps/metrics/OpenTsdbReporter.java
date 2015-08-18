@@ -19,6 +19,7 @@ import com.codahale.metrics.*;
 import com.codahale.metrics.Timer;
 import com.github.sps.metrics.opentsdb.OpenTsdb;
 import com.github.sps.metrics.opentsdb.OpenTsdbMetric;
+import com.github.sps.metrics.opentsdb.OpenTsdbTagProcessor;
 
 import java.util.*;
 import java.util.concurrent.TimeUnit;
@@ -34,7 +35,8 @@ public class OpenTsdbReporter extends ScheduledReporter {
     private final Clock clock;
     private final String prefix;
     private final Map<String, String> tags;
-
+    private long period;
+    private TimeUnit unit;
     /**
      * Returns a new {@link Builder} for {@link OpenTsdbReporter}.
      *
@@ -43,6 +45,13 @@ public class OpenTsdbReporter extends ScheduledReporter {
      */
     public static Builder forRegistry(MetricRegistry registry) {
         return new Builder(registry);
+    }
+
+    /**
+     * Starts the reporter polling at the period.
+     */
+    public void start() {
+        start(period, unit);
     }
 
     /**
@@ -59,6 +68,8 @@ public class OpenTsdbReporter extends ScheduledReporter {
         private MetricFilter filter;
         private Map<String, String> tags;
         private int batchSize;
+        private long period;
+        private TimeUnit unit;
 
         private Builder(MetricRegistry registry) {
             this.registry = registry;
@@ -68,6 +79,8 @@ public class OpenTsdbReporter extends ScheduledReporter {
             this.durationUnit = TimeUnit.MILLISECONDS;
             this.filter = MetricFilter.ALL;
             this.batchSize = OpenTsdb.DEFAULT_BATCH_SIZE_LIMIT;
+            this.unit = TimeUnit.SECONDS;
+            this.period = 5;
         }
 
         /**
@@ -148,6 +161,28 @@ public class OpenTsdbReporter extends ScheduledReporter {
         }
 
         /**
+         * specify reporting period
+         *
+         * @param period
+         * @return
+         */
+        public Builder withPeriod(long period) {
+            this.period = period;
+            return this;
+        }
+
+        /**
+         * specify reporting TimeUnit
+         *
+         * @param unit
+         * @return
+         */
+        public Builder withPeriod(TimeUnit unit) {
+            this.unit = unit;
+            return this;
+        }
+
+        /**
          * Builds a {@link OpenTsdbReporter} with the given properties, sending metrics using the
          * given {@link com.github.sps.metrics.opentsdb.OpenTsdb} client.
          *
@@ -162,7 +197,7 @@ public class OpenTsdbReporter extends ScheduledReporter {
                     prefix,
                     rateUnit,
                     durationUnit,
-                    filter, tags);
+                    filter, tags, period, unit);
         }
     }
 
@@ -195,12 +230,14 @@ public class OpenTsdbReporter extends ScheduledReporter {
         }
     }
 
-    private OpenTsdbReporter(MetricRegistry registry, OpenTsdb opentsdb, Clock clock, String prefix, TimeUnit rateUnit, TimeUnit durationUnit, MetricFilter filter, Map<String, String> tags) {
+    private OpenTsdbReporter(MetricRegistry registry, OpenTsdb opentsdb, Clock clock, String prefix, TimeUnit rateUnit, TimeUnit durationUnit, MetricFilter filter, Map<String, String> tags, long period, TimeUnit unit) {
         super(registry, "opentsdb-reporter", filter, rateUnit, durationUnit);
         this.opentsdb = opentsdb;
         this.clock = clock;
         this.prefix = prefix;
         this.tags = tags;
+        this.period = period;
+        this.unit = unit;
     }
 
     @Override
@@ -241,20 +278,18 @@ public class OpenTsdbReporter extends ScheduledReporter {
     }
 
     private Set<OpenTsdbMetric> buildTimers(String name, Timer timer, long timestamp) {
-        final MetricsCollector collector = MetricsCollector.createNew(prefix(name), tags, timestamp);
+
+        Map<String, String> metricTags = OpenTsdbTagProcessor.extractTags(name);
+        metricTags.putAll(tags);
+        final MetricsCollector collector = MetricsCollector.createNew(prefix(OpenTsdbTagProcessor.extractOriginalName(name)), metricTags, timestamp);
         final Snapshot snapshot = timer.getSnapshot();
 
         return collector.addMetric("count", timer.getCount())
                 //convert rate
-                .addMetric("m15", convertRate(timer.getFifteenMinuteRate()))
-                .addMetric("m5", convertRate(timer.getFiveMinuteRate()))
-                .addMetric("m1", convertRate(timer.getOneMinuteRate()))
-                .addMetric("mean_rate", convertRate(timer.getMeanRate()))
-                // convert duration
+
                 .addMetric("max", convertDuration(snapshot.getMax()))
                 .addMetric("min", convertDuration(snapshot.getMin()))
                 .addMetric("mean", convertDuration(snapshot.getMean()))
-                .addMetric("stddev", convertDuration(snapshot.getStdDev()))
                 .addMetric("median", convertDuration(snapshot.getMedian()))
                 .addMetric("p75", convertDuration(snapshot.get75thPercentile()))
                 .addMetric("p95", convertDuration(snapshot.get95thPercentile()))
@@ -266,14 +301,15 @@ public class OpenTsdbReporter extends ScheduledReporter {
 
     private Set<OpenTsdbMetric> buildHistograms(String name, Histogram histogram, long timestamp) {
 
-        final MetricsCollector collector = MetricsCollector.createNew(prefix(name), tags, timestamp);
+        Map<String, String> metricTags = OpenTsdbTagProcessor.extractTags(name);
+        metricTags.putAll(tags);
+        final MetricsCollector collector = MetricsCollector.createNew(prefix(OpenTsdbTagProcessor.extractOriginalName(name)), metricTags, timestamp);
         final Snapshot snapshot = histogram.getSnapshot();
 
         return collector.addMetric("count", histogram.getCount())
                 .addMetric("max", snapshot.getMax())
                 .addMetric("min", snapshot.getMin())
                 .addMetric("mean", snapshot.getMean())
-                .addMetric("stddev", snapshot.getStdDev())
                 .addMetric("median", snapshot.getMedian())
                 .addMetric("p75", snapshot.get75thPercentile())
                 .addMetric("p95", snapshot.get95thPercentile())
@@ -285,7 +321,9 @@ public class OpenTsdbReporter extends ScheduledReporter {
 
     private Set<OpenTsdbMetric> buildMeters(String name, Meter meter, long timestamp) {
 
-        final MetricsCollector collector = MetricsCollector.createNew(prefix(name), tags, timestamp);
+        Map<String, String> metricTags = OpenTsdbTagProcessor.extractTags(name);
+        metricTags.putAll(tags);
+        final MetricsCollector collector = MetricsCollector.createNew(prefix(OpenTsdbTagProcessor.extractOriginalName(name)), metricTags, timestamp);
 
         return collector.addMetric("count", meter.getCount())
                 // convert rate
@@ -297,16 +335,19 @@ public class OpenTsdbReporter extends ScheduledReporter {
     }
 
     private OpenTsdbMetric buildCounter(String name, Counter counter, long timestamp) {
-        return OpenTsdbMetric.named(prefix(name, "count"))
+        Map<String, String> metricTags = OpenTsdbTagProcessor.extractTags(name);
+        metricTags.putAll(tags);
+        return OpenTsdbMetric.named(prefix(OpenTsdbTagProcessor.extractOriginalName(name), "count"))
                 .withTimestamp(timestamp)
                 .withValue(counter.getCount())
                 .withTags(tags)
                 .build();
     }
 
-
     private OpenTsdbMetric buildGauge(String name, Gauge gauge, long timestamp) {
-        return OpenTsdbMetric.named(prefix(name, "value"))
+        Map<String, String> metricTags = OpenTsdbTagProcessor.extractTags(name);
+        metricTags.putAll(tags);
+        return OpenTsdbMetric.named(prefix(OpenTsdbTagProcessor.extractOriginalName(name), "value"))
                 .withValue(gauge.getValue())
                 .withTimestamp(timestamp)
                 .withTags(tags)
