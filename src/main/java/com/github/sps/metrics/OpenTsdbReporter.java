@@ -286,10 +286,15 @@ public class OpenTsdbReporter extends ScheduledReporter {
 
         return collector.addMetric("count", timer.getCount())
                 //convert rate
-
+                .addMetric("m15", convertRate(timer.getFifteenMinuteRate()))
+                .addMetric("m5", convertRate(timer.getFiveMinuteRate()))
+                .addMetric("m1", convertRate(timer.getOneMinuteRate()))
+                .addMetric("mean_rate", convertRate(timer.getMeanRate()))
+                // convert duration
                 .addMetric("max", convertDuration(snapshot.getMax()))
                 .addMetric("min", convertDuration(snapshot.getMin()))
                 .addMetric("mean", convertDuration(snapshot.getMean()))
+                .addMetric("stddev", convertDuration(snapshot.getStdDev()))
                 .addMetric("median", convertDuration(snapshot.getMedian()))
                 .addMetric("p75", convertDuration(snapshot.get75thPercentile()))
                 .addMetric("p95", convertDuration(snapshot.get95thPercentile()))
@@ -310,6 +315,7 @@ public class OpenTsdbReporter extends ScheduledReporter {
                 .addMetric("max", snapshot.getMax())
                 .addMetric("min", snapshot.getMin())
                 .addMetric("mean", snapshot.getMean())
+                .addMetric("stddev", snapshot.getStdDev())
                 .addMetric("median", snapshot.getMedian())
                 .addMetric("p75", snapshot.get75thPercentile())
                 .addMetric("p95", snapshot.get95thPercentile())
