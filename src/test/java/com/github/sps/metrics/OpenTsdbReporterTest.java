@@ -74,8 +74,6 @@ public class OpenTsdbReporterTest {
                 .filter(MetricFilter.ALL)
                 .withTags(TAGS)
                 .withBatchSize(100)
-                .withPeriod(100)
-                .withPeriod(TimeUnit.MILLISECONDS)
                 .build(opentsdb);
 
         when(clock.getTime()).thenReturn(timestamp * 1000);
@@ -178,7 +176,6 @@ public class OpenTsdbReporterTest {
 
     @Test
     public void testReportTimers() {
-
         final Timer timer = mock(Timer.class);
         when(timer.getCount()).thenReturn(1L);
         when(timer.getMeanRate()).thenReturn(1.0);
@@ -287,6 +284,85 @@ public class OpenTsdbReporterTest {
 
         final Set<OpenTsdbMetric> metrics = captor.getValue();
         assertEquals(0, metrics.size());
+    }
+
+    @Test
+    public void testReportHistogramCustomTags() {
+        Histogram histogram = mock(Histogram.class);
+
+        when(histogram.getSnapshot()).thenReturn(mock(Snapshot.class));
+
+        reporter.report(this.<Gauge>map(), this.<Counter>map(), this.map("histogram.tags:histogramTag1=tagValue&histogramTag2=67", histogram), this.<Meter>map(), this.<Timer>map());
+
+        verify(opentsdb).send(captor.capture());
+        Set<OpenTsdbMetric> metrics = captor.getValue();
+
+        for (OpenTsdbMetric metric : metrics) {
+            assertEquals("tagValue", metric.getTags().get("histogramTag1"));
+            assertEquals("67", metric.getTags().get("histogramTag2"));
+        }
+    }
+
+    @Test
+    public void testReportGaugesCustomTags() {
+        when(gauge.getValue()).thenReturn(1L);
+
+        reporter.report(this.map("gauge.tags:gaugeTag1=tagValue&gaugeTag2=35", gauge), this.<Counter>map(), this.<Histogram>map(), this.<Meter>map(), this.<Timer>map());
+
+        verify(opentsdb).send(captor.capture());
+        Set<OpenTsdbMetric> metrics = captor.getValue();
+
+        for (OpenTsdbMetric metric : metrics) {
+            assertEquals("tagValue", metric.getTags().get("gaugeTag1"));
+            assertEquals("35", metric.getTags().get("gaugeTag2"));
+        }
+    }
+
+    @Test
+    public void testReportCountersCustomTags() {
+        when(counter.getCount()).thenReturn(2L);
+
+        reporter.report(this.<Gauge>map(), this.map("counter.tags:counterTag1=tagValue&counterTag2=12344", counter), this.<Histogram>map(), this.<Meter>map(), this.<Timer>map());
+
+        verify(opentsdb).send(captor.capture());
+        Set<OpenTsdbMetric> metrics = captor.getValue();
+
+        for (OpenTsdbMetric metric : metrics) {
+            assertEquals("tagValue", metric.getTags().get("counterTag1"));
+            assertEquals("12344", metric.getTags().get("counterTag2"));
+        }
+    }
+
+    @Test
+    public void testReportTimersCustomTags() {
+        Timer timer = mock(Timer.class);
+
+        when(timer.getSnapshot()).thenReturn(mock(Snapshot.class));
+
+        reporter.report(this.<Gauge>map(), this.<Counter>map(), this.<Histogram>map(), this.<Meter>map(), this.map("timer.tags:timerTag1=tagValue&timerTag2=124143", timer));
+
+        verify(opentsdb).send(captor.capture());
+        Set<OpenTsdbMetric> metrics = captor.getValue();
+
+        for (OpenTsdbMetric metric : metrics) {
+            assertEquals("tagValue", metric.getTags().get("timerTag1"));
+            assertEquals("124143", metric.getTags().get("timerTag2"));
+        }
+    }
+
+    @Test
+    public void testReportMeterCustomTags() {
+        Meter meter = mock(Meter.class);
+
+        reporter.report(this.<Gauge>map(), this.<Counter>map(), this.<Histogram>map(), this.map("meter.tags:meterTag1=tagValue&meterTag2=3544", meter), this.<Timer>map());
+
+        verify(opentsdb).send(captor.capture());
+        Set<OpenTsdbMetric> metrics = captor.getValue();
+
+        for (OpenTsdbMetric metric : metrics) {
+            assertEquals("tagValue", metric.getTags().get("meterTag1"));
+            assertEquals("3544", metric.getTags().get("meterTag2"));
+        }
     }
 
     private <T> SortedMap<String, T> map() {
